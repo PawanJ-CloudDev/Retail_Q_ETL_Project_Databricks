@@ -35,15 +35,21 @@ flowchart TD
 
 ### 1. Data Sources
 
-* **PostgreSQL** — operational database containing orders, customers, inventory, and transactional retail data.
-* **Salesforce** — CRM data including accounts, leads, opportunities, and customer relationship information.
-* **S3** — raw file-based data such as CSV/JSON files.
+The project integrates data from three source systems:
+
+| Source         | Tables / Data     | SCD Strategy            |
+| -------------- | ----------------- | ----------------------- |
+| **PostgreSQL** | `product_catalog` | **SCD Type 2**          |
+| **PostgreSQL** | `inventory`       | **SCD Type 1**          |
+| **Salesforce** | `account`         | **SCD Type 2**          |
+| **Salesforce** | `opportunity`     | Standard transformation |
+| **Amazon S3**  | `transactions`    | Standard transformation |
 
 ### 2. Ingestion Layer
 
-* PostgreSQL data is ingested into the Databricks Bronze layer through the configured PostgreSQL ingestion pipeline.
-* Salesforce data is ingested into the Salesforce Bronze layer through the configured Salesforce ingestion process.
-* S3 files are incrementally ingested using Databricks Auto Loader where applicable.
+* **PostgreSQL** — `product_catalog` and `inventory` data are ingested into the Databricks Bronze layer through the configured PostgreSQL ingestion pipeline.
+* **Salesforce** — `account` and `opportunity` data are ingested into the Salesforce Bronze layer through the configured Salesforce ingestion process.
+* **Amazon S3** — `transactions` data is ingested into the Bronze layer through the configured S3 ingestion process.
 
 ### 3. Bronze Layer
 
@@ -56,6 +62,12 @@ It provides:
 * Reprocessing capability
 * Source-specific Bronze tables
 
+The Bronze layer contains:
+
+* PostgreSQL: `product_catalog`, `inventory`
+* Salesforce: `account`, `opportunity`
+* S3: `transactions`
+
 ### 4. Silver Layer
 
 The Silver layer cleans, validates, standardizes, and transforms Bronze data into a consistent structure.
@@ -65,12 +77,22 @@ Key activities include:
 * Data cleansing and standardization
 * Null and data quality validation
 * Business transformations
-* SCD1 and SCD2 implementation where required
+* SCD Type 1 and SCD Type 2 implementation
 * Schema normalization
 
-**SCD1** is used where only the latest value is required.
+#### Slowly Changing Dimensions
 
-**SCD2** is used where historical changes need to be maintained using effective-date information.
+Different SCD strategies are applied based on business requirements:
+
+| Table             | SCD Type       | Purpose                                                                        |
+| ----------------- | -------------- | ------------------------------------------------------------------------------ |
+| `product_catalog` | **SCD Type 2** | Maintains historical changes to product attributes                             |
+| `account`         | **SCD Type 2** | Maintains historical changes to customer/account attributes                    |
+| `inventory`       | **SCD Type 1** | Keeps the latest inventory information without maintaining historical versions |
+
+**SCD Type 1** updates the existing record with the latest value. Historical values are not retained.
+
+**SCD Type 2** preserves historical versions of records by creating new versions when tracked attributes change.
 
 Data quality rules are implemented using Databricks expectations such as `expect` and `expect_or_drop`.
 
